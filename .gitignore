@@ -1,0 +1,6 @@
+docker/acme/acme.json
+docker/traefik.log
+.env
+docker/uptimekuma
+docker/nodered
+docker/node-red-build

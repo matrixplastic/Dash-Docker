@@ -113,41 +113,60 @@ services:
       - "traefik.http.routers.signal.entrypoints=websecure"
       - "traefik.http.routers.signal.tls.certresolver=matrixresolver"
 
-  homeassistant:
-    container_name: homeassistant
-    image: "ghcr.io/home-assistant/home-assistant:stable"
+
+  snipe-mysql:
+    container_name: snipe-mysql
+    image: mysql:5.6
+    networks:
+      - snipeit-backend
+    env_file:
+      - ./.env
     volumes:
-      - ./docker/homeassistant:/config
-      - /etc/localtime:/etc/localtime:ro
-    # devices:
-      # - /dev/serial/by-id/usb-Silicon_Labs_HubZ_Smart_Home_Controller_715001B8-if01-port0:/dev/serial/by-id/usb-Silicon_Labs_HubZ_Smart_Home_Controller_715001B8-if01-port0
+      - ./docker/snipesql-vol:/var/lib/mysql
+#      - db:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    expose:
+      - "3306"
+
+
+  snipe-it:
+    image: lscr.io/linuxserver/snipe-it:latest
+    restart: unless-stopped
+    container_name: snipeit
+    networks:
+      - snipeit-backend
+      - proxy
+    volumes:
+      - ./docker/logs:/var/www/html/storage/logs
+      - ./docker/snipeit:/config
+      - ./trustedproxy.php:/app/www/vendor/fideloper/proxy/config/trustedproxy.php
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-      - DISABLE_JEMALLOC= true
-    restart: unless-stopped
-    privileged: true
-    cap_add:
-      - NET_ADMIN
-      - NET_BIND_SERVICE
-      - SYS_ADMIN
-    network_mode: host
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8123"]
-      interval: 2m
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      - APP_URL=https://snipeit.matrixplastic.com
+      - NGINX_APP_URL=snipeit.matrixplastic.com
+      - MYSQL_PORT_3306_TCP_ADDR=snipe-mysql
+      - MYSQL_PORT_3306_TCP_PORT=3306
+      - MYSQL_DATABASE=snipeit
+      - MYSQL_USER=snipeit
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - APP_ENV=production #optional
+      - APP_TRUSTED_PROXIES=${APP_TRUSTED_PROXIES}
+      - APP_FORCE_TLS=true
+    env_file:
+      - ./.env
+    depends_on:
+      - snipe-mysql
     labels:
       - "traefik.enable=true"
-      - "traefik.http.services.homeassistant.loadbalancer.server.port=8123"
-      - "traefik.http.routers.homeassistant.rule=Host(`homeassistant.${DOMAIN}`)"
-      - "traefik.http.routers.homeassistant.entrypoints=websecure"
-      - "traefik.http.routers.homeassistant.tls.certresolver=matrixresolver"
+     # - "traefik.http.services.snipeit.loadbalancer.server.port=80"
+      - "traefik.http.routers.snipeit.rule=Host(`snipeit.${DOMAIN}`)"
+      - "traefik.http.routers.snipeit.entrypoints=websecure"
 
 networks:
   bridge:
     driver: bridge
   proxy:
     driver: bridge
+  snipeit-backend: {}

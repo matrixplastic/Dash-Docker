@@ -4,3 +4,6 @@ docker/traefik.log
 docker/uptimekuma
 docker/nodered
 docker/node-red-build
+docker/*
+.vscode/settings.json
+docker-compose.yml.save
